@@ -1,5 +1,8 @@
 package com.fyp.collaborite
 
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.wifi.p2p.WifiP2pManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +16,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.fyp.collaborite.ui.theme.CollaboriteTheme
 
 class MainActivity : ComponentActivity() {
+    private val intentFilter = IntentFilter()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -23,6 +27,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        val changePage = Intent(this,ConnectionActivity::class.java)
+
+        // Error: "Please specify constructor invocation;
+        // classifier 'Page2' does not have a companion object"
+
+        startActivity(changePage)
+
     }
 }
 
