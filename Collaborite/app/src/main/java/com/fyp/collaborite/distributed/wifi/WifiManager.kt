@@ -11,8 +11,16 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pManager
 import android.util.Log
+import android.widget.ListAdapter
 import android.widget.Toast
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.core.app.ActivityCompat
+import androidx.recyclerview.widget.AsyncListDiffer.ListListener
 import com.fyp.collaborite.ConnectionActivity
 
 class WifiManager(val activity: ConnectionActivity,val manager: WifiP2pManager,val channel: WifiP2pManager.Channel) {
@@ -20,6 +28,7 @@ class WifiManager(val activity: ConnectionActivity,val manager: WifiP2pManager,v
         receiver = WifiDirectBroadcastReceiver(manager, channel, this.activity)
         return  receiver
     }
+
 
     var isWifiP2pEnabled: Boolean=false
     var receiver:  WifiDirectBroadcastReceiver? = null
@@ -30,7 +39,9 @@ class WifiManager(val activity: ConnectionActivity,val manager: WifiP2pManager,v
         if (refreshedPeers != peers) {
             peers.clear()
             peers.addAll(refreshedPeers)
+
             Log.d("WIFI","Peers Discovered${peers.size}")
+
 
             // If an AdapterView is backed by this data, notify it
             // of the change. For instance, if you have a ListView of
@@ -109,15 +120,16 @@ class WifiManager(val activity: ConnectionActivity,val manager: WifiP2pManager,v
                 // Device is ready to accept incoming connections from peers.
                 manager.requestGroupInfo(channel,object :WifiP2pManager.GroupInfoListener{
                     override fun onGroupInfoAvailable(p0: WifiP2pGroup?) {
-                        Log.d("GROUP",p0.toString())
+                        Log.d("WIFI",p0.toString())
                     }
                 })
             }
 
             override fun onFailure(reason: Int) {
+
                 Toast.makeText(
                     activity,
-                    "P2P group creation failed. Retry.",
+                    "P2P group creation failed. Retry.${reason}",
                     Toast.LENGTH_SHORT
                 ).show()
             }
