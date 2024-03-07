@@ -6,12 +6,15 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.icu.text.CaseMap.Title
+import android.net.Uri
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import androidx.activity.ComponentActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.CallSuper
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.text.isDigitsOnly
 import com.fyp.collaborite.ui.theme.CollaboriteTheme
 import com.fyp.collaborite.components.Components
@@ -53,6 +59,9 @@ import com.fyp.collaborite.distributed.wifi.WifiManager
 import com.google.android.gms.nearby.connection.ConnectionInfo
 import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
+import java.io.File
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class ConnectionActivity : ComponentActivity() {
 
@@ -60,7 +69,10 @@ class ConnectionActivity : ComponentActivity() {
     lateinit var wifiManager:WifiManager
     lateinit var serviceManager: ServiceManager
     lateinit var wifiKtsManager: WifiKtsManager
+    private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
 
+    private lateinit var outputDirectory: File
+    private lateinit var cameraExecutor: ExecutorService
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +83,7 @@ class ConnectionActivity : ComponentActivity() {
 
 
             }
+        requestCameraPermission();
         // Indicates a change in the Wi-Fi Direct status.
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
 
@@ -259,16 +272,25 @@ class ConnectionActivity : ComponentActivity() {
 
                     })
                     Text("______")
-                    InputField(label = "Send Data", onValueChange = {
-                        data=it
-                    })
-                    Button(
+                    if (shouldShowCamera.value) {
+                        CameraView(
+                            outputDirectory = outputDirectory,
+                            executor = cameraExecutor,
+                            onImageCaptured = ::handleImageCapture,
+                            onError = { Log.e("kilo", "View error:", it) }
+                        )
+                    }
+//                    InputField(label = "Send Data", onValueChange = {
+//                        data=it
+//                    })
+//                    Button(
+//
+//                        content = {Text("Send Data")},
+//                        enabled = wifiKtsManager.connectedPeers.size>0,
+//                        onClick = {
+//                        wifiKtsManager.sendWeights(data)
+//                    })
 
-                        content = {Text("Send Data")},
-                        enabled = wifiKtsManager.connectedPeers.size>0,
-                        onClick = {
-                        wifiKtsManager.sendWeights(data)
-                    })
 
                     Text(text = "Peers")
                     PeerList(peers =wifiKtsManager.peers)
@@ -279,4 +301,53 @@ class ConnectionActivity : ComponentActivity() {
 
     }
 
+    private fun requestCameraPermission() {
+
+        outputDirectory = getOutputDirectory()
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                Log.i("kilo", "Permission previously granted")
+                shouldShowCamera.value = true //
+            }
+
+            ActivityCompat.shouldShowRequestPermissionRationale(
+                this,
+                android.Manifest.permission.CAMERA
+            ) -> Log.i("kilo", "Show camera permissions dialog")
+
+            else -> requestPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+        }
+    }
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.i("kilo", "Permission granted")
+            shouldShowCamera.value = true //
+        } else {
+            Log.i("kilo", "Permission denied")
+        }
+    }
+
+    private fun handleImageCapture(uri: Uri) {
+        Log.i("kilo", "Image captured: $uri")
+//        shouldShowCamera.value = false
+    }
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() }
+        }
+
+        return if (mediaDir != null && mediaDir.exists()) mediaDir else filesDir
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraExecutor.shutdown()
+    }
 }
