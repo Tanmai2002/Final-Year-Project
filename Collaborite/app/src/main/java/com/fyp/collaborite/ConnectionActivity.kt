@@ -1,38 +1,34 @@
 package com.fyp.collaborite
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.Intent
+//import androidx.compose.foundation.layout.ColumnScopeInstance.align
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.icu.text.CaseMap.Title
 import android.net.Uri
-import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
-import androidx.activity.ComponentActivity
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.CallSuper
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -42,22 +38,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.text.isDigitsOnly
-import com.fyp.collaborite.ui.theme.CollaboriteTheme
-import com.fyp.collaborite.components.Components
-import com.fyp.collaborite.components.PermissionList
-import com.fyp.collaborite.constants.REQUIRED_PERMISSIONS
 import com.fyp.collaborite.distributed.wifi.ServiceManager
-import com.fyp.collaborite.distributed.wifi.WifiDirectBroadcastReceiver
 import com.fyp.collaborite.distributed.wifi.WifiKtsManager
 import com.fyp.collaborite.distributed.wifi.WifiManager
-import com.google.android.gms.nearby.connection.ConnectionInfo
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
+import com.fyp.collaborite.ui.theme.CollaboriteTheme
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -248,6 +239,8 @@ class ConnectionActivity : ComponentActivity() {
         var codeNumber by remember {
             mutableStateOf(0)
         }
+        var shouldShowCamera by remember { mutableStateOf(false) }
+
 
         CollaboriteTheme {
             Scaffold (
@@ -272,14 +265,14 @@ class ConnectionActivity : ComponentActivity() {
 
                     })
                     Text("______")
-                    if (shouldShowCamera.value) {
-                        CameraView(
-                            outputDirectory = outputDirectory,
-                            executor = cameraExecutor,
-                            onImageCaptured = ::handleImageCapture,
-                            onError = { Log.e("kilo", "View error:", it) }
-                        )
-                    }
+//                    if (shouldShowCamera.value) {
+//                        CameraView(
+//                            outputDirectory = outputDirectory,
+//                            executor = cameraExecutor,
+//                            onImageCaptured = ::handleImageCapture,
+//                            onError = { Log.e("kilo", "View error:", it) }
+//                        )
+//                    }
 //                    InputField(label = "Send Data", onValueChange = {
 //                        data=it
 //                    })
@@ -290,10 +283,41 @@ class ConnectionActivity : ComponentActivity() {
 //                        onClick = {
 //                        wifiKtsManager.sendWeights(data)
 //                    })
+                    Box{
+                        if (shouldShowCamera) {
+                            CameraView(
+                                outputDirectory = outputDirectory,
+                                executor = cameraExecutor,
+                                onImageCaptured = ::handleImageCapture,
+                                onError = { Log.e("kilo", "View error:", it) }
+                            )
+                        } else {
+                          Column {
+                              Text(text = "Peers")
+                              PeerList(peers = wifiKtsManager.peers)
+                          }
+                        }
+
+                        IconButton(
+                            enabled=wifiKtsManager.peers.isNotEmpty() || shouldShowCamera,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                            onClick = {
+                            shouldShowCamera = !shouldShowCamera
+                        }) {
+                            Icon(
+                                modifier = Modifier.padding(8.dp),
+                                tint= if(shouldShowCamera) Color.White else Color.Black,
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
 
 
-                    Text(text = "Peers")
-                    PeerList(peers =wifiKtsManager.peers)
+                    }
+
+
+
+
                 }
 
             }
