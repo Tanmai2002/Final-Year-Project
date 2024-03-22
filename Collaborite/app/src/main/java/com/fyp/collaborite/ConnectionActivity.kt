@@ -1,16 +1,25 @@
 package com.fyp.collaborite
 
 //import androidx.compose.foundation.layout.ColumnScopeInstance.align
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Bundle
+import android.util.AttributeSet
 import android.util.Log
+import android.view.View
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.CallSuper
+import androidx.camera.core.ImageProxy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,20 +59,25 @@ import com.fyp.collaborite.distributed.wifi.WifiKtsManager
 import com.fyp.collaborite.distributed.wifi.WifiManager
 import com.fyp.collaborite.ui.theme.CollaboriteTheme
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
+import org.tensorflow.lite.examples.modelpersonalization.TransferLearningHelper
+import org.tensorflow.lite.support.label.Category
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class ConnectionActivity : ComponentActivity() {
+class ConnectionActivity : ComponentActivity(),TransferLearningHelper.ClassifierListener {
 
     private val intentFilter = IntentFilter()
     lateinit var wifiManager:WifiManager
     lateinit var serviceManager: ServiceManager
     lateinit var wifiKtsManager: WifiKtsManager
     private var shouldShowCamera: MutableState<Boolean> = mutableStateOf(false)
-
+    private var tvLossConsumerPause : MutableState<String> = mutableStateOf("")
+    private var tvLossConsumerResume : MutableState<String> = mutableStateOf("")
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var transferLearningHelper: TransferLearningHelper
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,7 +123,13 @@ class ConnectionActivity : ComponentActivity() {
                 REQUEST_CODE_REQUIRED_PERMISSIONS
             )
         }
+        transferLearningHelper = TransferLearningHelper(
+            context = applicationContext,
+            classifierListener = this
+        )
     }
+
+
 //    @CallSuper
 //    override fun onRequestPermissionsResult(
 //        requestCode: Int,
@@ -284,11 +304,13 @@ class ConnectionActivity : ComponentActivity() {
 //                        wifiKtsManager.sendWeights(data)
 //                    })
                     Box{
-                        if (shouldShowCamera) {
+                        if (!shouldShowCamera) {
                             CameraView(
                                 outputDirectory = outputDirectory,
                                 executor = cameraExecutor,
-                                onImageCaptured = ::handleImageCapture,
+                                onTrueImage = ::handleImageCapture,
+                                onFalseImage= ::handleImageCapture,
+
                                 onError = { Log.e("kilo", "View error:", it) }
                             )
                         } else {
@@ -357,8 +379,23 @@ class ConnectionActivity : ComponentActivity() {
         }
     }
 
-    private fun handleImageCapture(uri: Uri) {
-        Log.i("kilo", "Image captured: $uri")
+    private fun handleImageCapture(image: ImageProxy,className:String) {
+        Log.i("kilo", "Image captured: ")
+
+        val imageRotation = image.imageInfo.rotationDegrees
+        val buffer = image.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+
+        // Release the ImageProxy
+
+
+        // Pass Bitmap and rotation to the transfer learning helper for
+        // processing and prepare training data.
+        transferLearningHelper.addSample(bitmap, className, imageRotation)
+        image.close()
+//        transferLearningHelper.addSample(bitmap,"1",)
 //        shouldShowCamera.value = false
     }
 
@@ -373,5 +410,41 @@ class ConnectionActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+    }
+
+
+    @SuppressLint("NotifyDataSetChanged")
+    override fun onError(error: String) {
+//        activity?.runOnUiThread {
+            Toast.makeText(applicationContext, error, Toast.LENGTH_SHORT).show()
+//        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    override fun onResults(
+        results: List<Category>?,
+        inferenceTime: Long
+    ) {
+//        activity?.runOnUiThread {
+            // Update the result in inference mode.
+
+                // Show result
+                results?.let { list ->
+                    print(list)
+                }
+
+
+//        }
+    }
+
+    // Show the loss number after each training.
+    override fun onLossResults(lossNumber: Float) {
+        String.format(
+            Locale.US,
+            "Loss: %.3f", lossNumber
+        ).let {
+           tvLossConsumerPause.value = it
+            tvLossConsumerResume.value = it
+        }
     }
 }

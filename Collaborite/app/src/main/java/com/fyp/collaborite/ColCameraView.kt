@@ -1,22 +1,28 @@
 package com.fyp.collaborite
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.sharp.Add
+import androidx.compose.material.icons.sharp.Clear
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -46,11 +52,13 @@ import kotlin.coroutines.suspendCoroutine
             }, ContextCompat.getMainExecutor(this))
         }
     }
+
     @Composable
     public fun CameraView(
         outputDirectory: File,
         executor: Executor,
-        onImageCaptured: (Uri) -> Unit,
+        onTrueImage: (ImageProxy,String) -> Unit,
+        onFalseImage: (ImageProxy,String) -> Unit,
         onError: (ImageCaptureException) -> Unit
     ) {
         // 1
@@ -83,33 +91,85 @@ import kotlin.coroutines.suspendCoroutine
         Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize()) {
             AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
 
-            IconButton(
-                modifier = Modifier.padding(bottom = 20.dp),
-                onClick = {
-                    Log.i("kilo", "ON CLICK")
-                    takePhoto(
-                        filenameFormat = "yyyy-MM-dd-HH-mm-ss-SSS",
-                        imageCapture = imageCapture,
-                        outputDirectory = outputDirectory,
-                        executor = executor,
-                        onImageCaptured = onImageCaptured,
-                        onError = onError
-                    )
-                },
-                content = {
-                    Icon(
-                        imageVector = Icons.Sharp.Add,
-                        contentDescription = "Take picture",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(100.dp)
-                            .padding(1.dp)
-                            .border(1.dp, Color.White, CircleShape)
-                    )
-                }
-            )
+           Row {
+               IconButton(
+                   modifier = Modifier.padding(bottom = 20.dp),
+                   onClick = {
+                       Log.i("kilo", "ON CLICK")
+                       takePhotoAndSaveAsBitmap(
+
+                           imageCapture = imageCapture,
+                           executor = executor,
+                           onBitmapCaptured = onTrueImage,
+                           onError = onError,
+                           className = "1"
+                       )
+                   },
+                   content = {
+                       Icon(
+                           imageVector = Icons.Sharp.Add,
+                           contentDescription = "Take picture",
+                           tint = Color.White,
+                           modifier = Modifier
+                               .size(100.dp)
+                               .padding(1.dp)
+                               .border(1.dp, Color.White, CircleShape)
+                       )
+                   }
+               )
+               IconButton(
+                   modifier = Modifier.padding(bottom = 20.dp),
+                   onClick = {
+                       Log.i("kilo", "ON CLICK")
+                       takePhotoAndSaveAsBitmap(
+
+                           imageCapture = imageCapture,
+                           executor = executor,
+                           onBitmapCaptured = onFalseImage,
+                           onError = onError,
+                           className = "2"
+                       )
+                   },
+                   content = {
+                       Icon(
+                           imageVector = Icons.Sharp.Clear,
+                           contentDescription = "Take picture",
+                           tint = Color.White,
+                           modifier = Modifier
+                               .size(100.dp)
+                               .padding(1.dp)
+                               .border(1.dp, Color.White, CircleShape)
+                       )
+                   }
+               )
+           }
         }
     }
+
+private fun takePhotoAndSaveAsBitmap(
+    imageCapture: ImageCapture,
+    executor: Executor,
+    onBitmapCaptured: (ImageProxy,String) -> Unit,
+    onError: (ImageCaptureException) -> Unit,
+    className: String
+) {
+    // Capture the image and process it
+    imageCapture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
+        override fun onError(exception: ImageCaptureException) {
+            // Handle capture error
+            onError(exception)
+        }
+
+        override fun onCaptureSuccess(image: ImageProxy) {
+            // Convert ImageProxy to Bitmap
+
+
+            // Call the callback with the captured bitmap
+            onBitmapCaptured(image,className)
+        }
+    })
+}
+
     private fun takePhoto(
         filenameFormat: String,
         imageCapture: ImageCapture,

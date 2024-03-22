@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("de.undercouch.download")
+
 }
 android {
     namespace = "com.fyp.collaborite"
@@ -35,6 +37,9 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        this.noCompress.add("tflite")
+    }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.4.3"
 
@@ -45,9 +50,12 @@ android {
         }
     }
 }
+project.ext.set("ASSET_DIR", "${projectDir}/src/main/assets")
 
+apply {
+    from("download_models.gradle")
+}
 dependencies {
-
 
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
@@ -74,6 +82,13 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.0.1")
     implementation("androidx.camera:camera-lifecycle:1.0.1")
     implementation("androidx.camera:camera-view:1.0.0-alpha27")
+
+    // Tensorflow lite dependencies
+    implementation("org.tensorflow:tensorflow-lite:2.9.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    implementation ("org.tensorflow:tensorflow-lite-support:0.4.2")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.9.0")
+
 
 // Icons
 //    implementation("androidx.compose.material:material-icons-extended:$compose_version")
