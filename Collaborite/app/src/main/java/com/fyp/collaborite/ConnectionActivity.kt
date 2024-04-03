@@ -2,18 +2,13 @@ package com.fyp.collaborite
 
 //import androidx.compose.foundation.layout.ColumnScopeInstance.align
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Bundle
-import android.util.AttributeSet
 import android.util.Log
-import android.view.View
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -77,7 +72,7 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
     private var tvLossConsumerResume : MutableState<String> = mutableStateOf("")
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
-    private lateinit var transferLearningHelper: TransferLearningHelper
+    private var isObjectPresent = mutableStateOf(false)
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -123,10 +118,7 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
                 REQUEST_CODE_REQUIRED_PERMISSIONS
             )
         }
-        transferLearningHelper = TransferLearningHelper(
-            context = applicationContext,
-            classifierListener = this
-        )
+
     }
 
 
@@ -199,8 +191,8 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
 
                                 Column {
                                     Text("Connected")
-                                    Text("${wifiKtsManager.weightInitialized[it]?.count?.value}")
-                                    Text("${wifiKtsManager.weightInitialized[it]?.value?.value}")
+
+//                                    Text("${wifiKtsManager.weightInitialized[it]?.value?.value}")
 
                                 }
 
@@ -267,9 +259,8 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
                 topBar = { AppBar(heading = "Connection") }
             ){
                 Column(modifier=Modifier.padding(it), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Weighted Value:${wifiKtsManager.finalVal.value}")
+                    Text(text = "Weighted Value:${wifiKtsManager.sampleCount.value}")
 
-                    Text(text = "Current Value : ${wifiKtsManager.currentWeight.value.value.value} Count:${wifiKtsManager.currentWeight.value.count.value}")
                     InputField(label = "Start Discovery", onValueChange = {
                         codeNumber=it
                     })
@@ -304,14 +295,17 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
 //                        wifiKtsManager.sendWeights(data)
 //                    })
                     Box{
-                        if (!shouldShowCamera) {
+                        if (shouldShowCamera) {
                             CameraView(
                                 outputDirectory = outputDirectory,
                                 executor = cameraExecutor,
                                 onTrueImage = ::handleImageCapture,
                                 onFalseImage= ::handleImageCapture,
 
-                                onError = { Log.e("kilo", "View error:", it) }
+                                onError = { Log.e("kilo", "View error:", it) },
+                                onImageUpdate = {it,y->
+//                                    wifiKtsManager.transferLearningHelper.classify(it,y)
+                                }
                             )
                         } else {
                           Column {
@@ -378,23 +372,44 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
             Log.i("kilo", "Permission denied")
         }
     }
-
+    fun getResizedBitmap(image: Bitmap, maxSize: Int): Bitmap? {
+        var width = image.width
+        var height = image.height
+        val bitmapRatio = width.toFloat() / height.toFloat()
+        if (bitmapRatio > 0) {
+            width = maxSize
+            height = (width / bitmapRatio).toInt()
+        } else {
+            height = maxSize
+            width = (height * bitmapRatio).toInt()
+        }
+        return Bitmap.createScaledBitmap(image, width, height, true)
+    }
     private fun handleImageCapture(image: ImageProxy,className:String) {
         Log.i("kilo", "Image captured: ")
 
         val imageRotation = image.imageInfo.rotationDegrees
         val buffer = image.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
+
         buffer.get(bytes)
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val bit2=getResizedBitmap(bitmap,500)!!
 
         // Release the ImageProxy
 
 
         // Pass Bitmap and rotation to the transfer learning helper for
         // processing and prepare training data.
-        transferLearningHelper.addSample(bitmap, className, imageRotation)
+        wifiKtsManager.transferLearningHelper.addSample(bitmap, className, imageRotation)
+        wifiKtsManager.sampleCount.value=wifiKtsManager.transferLearningHelper.getSampleCount()
         image.close()
+//        wifiKtsManager.transferLearningHelper.startTraining();
+//
+//        Timer("Stopping Training", false).schedule(1500) {
+//            wifiKtsManager.transferLearningHelper.pauseTraining()
+//        }
+        wifiKtsManager.sendWeights(bit2,className)
 //        transferLearningHelper.addSample(bitmap,"1",)
 //        shouldShowCamera.value = false
     }
@@ -430,7 +445,7 @@ class ConnectionActivity : ComponentActivity(),TransferLearningHelper.Classifier
 
                 // Show result
                 results?.let { list ->
-                    print(list)
+                    Log.d("WIFI","${list.size} : First Elemenet: ${list[0]}")
                 }
 
 

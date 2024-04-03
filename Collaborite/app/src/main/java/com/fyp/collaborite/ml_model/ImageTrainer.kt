@@ -51,7 +51,9 @@ class TransferLearningHelper(
     private var interpreter: Interpreter? = null
     private val trainingSamples: MutableList<TrainingSample> = mutableListOf()
     private var executor: ExecutorService? = null
-
+    public fun getSampleCount():Int {
+        return trainingSamples.size;
+    }
     //This lock guarantees that only one thread is performing training and
     //inference at any point in time.
     private val lock = Any()

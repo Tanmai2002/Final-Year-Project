@@ -59,12 +59,14 @@ import kotlin.coroutines.suspendCoroutine
         executor: Executor,
         onTrueImage: (ImageProxy,String) -> Unit,
         onFalseImage: (ImageProxy,String) -> Unit,
-        onError: (ImageCaptureException) -> Unit
+        onError: (ImageCaptureException) -> Unit,
+        onImageUpdate: (Bitmap,Int)->Unit
     ) {
         // 1
         val lensFacing = CameraSelector.LENS_FACING_BACK
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
+
 
         val preview = Preview.Builder().build()
         val previewView = remember { PreviewView(context) }
@@ -89,7 +91,17 @@ import kotlin.coroutines.suspendCoroutine
 
         // 3
         Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize()) {
-            AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
+            AndroidView({ previewView }, modifier = Modifier.fillMaxSize(), update = {
+
+                it.rotation
+                it.bitmap.let {x->
+                    if(x!=null){
+                        onImageUpdate(x,it.rotation.toInt())
+
+                    }
+                }
+
+            })
 
            Row {
                IconButton(
@@ -165,6 +177,7 @@ private fun takePhotoAndSaveAsBitmap(
 
 
             // Call the callback with the captured bitmap
+
             onBitmapCaptured(image,className)
         }
     })

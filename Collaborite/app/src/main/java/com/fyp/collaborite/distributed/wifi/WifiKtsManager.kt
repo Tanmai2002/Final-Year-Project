@@ -1,5 +1,9 @@
 package com.fyp.collaborite.distributed.wifi
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.HandlerThread
+import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
@@ -21,69 +25,51 @@ import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import com.google.android.gms.nearby.connection.Strategy
+import org.tensorflow.lite.examples.modelpersonalization.TransferLearningHelper
+import java.io.ByteArrayOutputStream
+import java.util.Timer
+import java.util.concurrent.Future
+import java.util.logging.Handler
+import kotlin.concurrent.schedule
 import kotlin.text.Charsets.UTF_8
 
-
-class Weights(var it_value:Int=0,var it_count:Int=0){
-    var value:MutableState<Int> = mutableStateOf<Int>(0)
-    var count= mutableStateOf<Int>(0)
-    init {
-        value.value=it_value
-        count.value=it_count
-
-
-
-    }
-    fun recalValue(vali:Int){
-        if(count.value==0){
-            value.value=vali
-            count.value=1
-            return
-        }
-        value.value=(value.value*count.value+vali)/(count.value+1)
-        count.value+=1
-    }
-    fun toStringParcable():String{
-        return "${value.value} ${count.value}"
-    }
-
-    companion object{
-        fun calculateWeights(weights:List<Weights>) :Int{
-            var ansVal:Int=0;
-            var ansCount:Int=0;
-            for(w in weights){
-                ansCount+=w.count.value
-                ansVal+=w.value.value*w.count.value
-            }
-
-            if(ansCount==0){
-                return ansVal
-            }
-            return ansVal/ansCount
-        }
-        fun fromParcableString(data:String):Weights{
-            val part=data.split(" ");
-            return Weights(part[0].toInt(),part[1].toInt())
-        }
-    }
-}
 
 class WifiKtsManager(val activity: ConnectionActivity) {
     lateinit var myCodeName:String
     val packageName="com.fyp.collaborite"
     val peers= mutableStateListOf<String>()
-    val weightInitialized= mutableStateMapOf<String,Weights>()
-    val currentWeight= mutableStateOf(Weights())
+    val sampleCount= mutableStateOf<Int>(0)
+
     val finalVal= mutableStateOf(0)
     val connectedPeers= mutableStateListOf<String>()
     var peerMap= mutableStateMapOf<String,DiscoveredEndpointInfo>()
 
-    fun sendWeights(number:Int) {
-        currentWeight.value.recalValue(number)
-        finalVal.value=Weights.calculateWeights(weightInitialized.values.plus(currentWeight.value))
+    public lateinit var transferLearningHelper: TransferLearningHelper;
+    init {
+        transferLearningHelper = TransferLearningHelper(
+            context = activity.applicationContext,
+            classifierListener = activity
+        )
+    }
+
+
+    private fun bitmapToByte(image: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        image.compress(Bitmap.CompressFormat.PNG, 90, stream)
+
+        return stream.toByteArray()
+    }
+    fun sendWeights(bitmap: Bitmap,className: String) {
+        if(className!="1"){
+            Log.d("WIFI","SEND ONLY True Images")
+            return;
+        }
+
+
+
         connectionsClient.sendPayload(
             connectedPeers,
-            Payload.fromBytes(currentWeight.value.toStringParcable().toByteArray(UTF_8))
+            Payload.fromBytes(bitmapToByte(bitmap))
         ).addOnCompleteListener {
             if(it.isSuccessful){
                 Log.d("WIFI","Payload Sending Success")
@@ -171,11 +157,19 @@ class WifiKtsManager(val activity: ConnectionActivity) {
 
                 payload.asBytes()?.let {
                    Log.d("WIFI",String(it, UTF_8));
-                    weightInitialized.put(endpointId,Weights.fromParcableString(String(it, UTF_8)))
-
+//                    weightInitialized.put(endpointId,Weights.fromParcableString(String(it, UTF_8)))
+                    val bmp = BitmapFactory.decodeByteArray(it, 0, it.size)
+                    //TODO Update with real values
+                    transferLearningHelper.addSample(bmp,"1",0);
+                    sampleCount.value=transferLearningHelper.getSampleCount()
                 }
+//                transferLearningHelper.startTraining();
+//
+//                Timer("Stopping Training", false).schedule(1500) {
+//                    transferLearningHelper.pauseTraining()
+//                }
 
-                finalVal.value=Weights.calculateWeights(weightInitialized.values.plus(currentWeight.value) as List<Weights>)
+//                finalVal.value=Weights.calculateWeights(weightInitialized.values.plus(currentWeight.value) as List<Weights>)
             }
 
             override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
